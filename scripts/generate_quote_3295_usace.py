@@ -177,7 +177,8 @@ def line_items():
         Paragraph(
             "Performed on site at Winfield Lock and Dam, Red House, WV by an "
             "NCCCO-Certified Crane Inspector to OSHA 29 CFR 1926.1412(f) / "
-            "1910.180(d) and ASME B30.5.",
+            "1910.180(d) and ASME B30.5. <b>Annual inspection only &#8212; does "
+            "not include a load test.</b>",
             S["small"],
         ),
     ]
@@ -214,7 +215,6 @@ def total_row():
 
 INCLUDED = [
     "Annual/comprehensive inspection by an NCCCO-Certified Crane Inspector",
-    "Inspected to OSHA 29 CFR 1926.1412(f) / 1910.180(d) and ASME B30.5 criteria",
     "Structural, mechanical, hydraulic, and electrical systems; boom and outriggers",
     "Wire rope, hooks, sheaves, rigging hardware, limit and safety devices, load chart",
     "Written inspection report and dated inspection decal on completion",
@@ -226,7 +226,6 @@ TERMS = [
                     "subject to inspector availability."),
     ("Site requirements:", "The crane must be available with a qualified operator "
                            "on site for function checks."),
-    ("Quote validity:", "This quote is valid for 30 days from the date above."),
     ("Payment:", "Net 30 from submission of the inspection report. Government "
                  "purchase card or purchase order accepted."),
 ]
@@ -244,6 +243,24 @@ def terms():
     rows = [[Paragraph(f"<b>{k}</b> {v}", S["body"])] for k, v in TERMS]
     t = Table(rows, colWidths=[CONTENT_W])
     t.setStyle(TableStyle(FLUSH + [("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+    return t
+
+
+def exclusions():
+    """Called out on its own band so the scope limit cannot be missed."""
+    t = Table([[Paragraph(
+        "<b>NOT INCLUDED:</b> Annual (periodic) inspection only. A <b>load test is "
+        "not included</b>, nor is NDT or repair of any deficiencies found "
+        "&#8212; these can be quoted separately on request.",
+        S["body"])]], colWidths=[CONTENT_W])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), BAND),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LINEBEFORE", (0, 0), (0, -1), 2, ORANGE),
+    ]))
     return t
 
 
@@ -302,11 +319,7 @@ def build():
             Spacer(1, 5),
             bullets(),
             Spacer(1, 8),
-            Paragraph(
-                "Note: Load testing, non-destructive testing, and repair of any "
-                "deficiencies found are not included and can be quoted separately.",
-                S["note"],
-            ),
+            exclusions(),
         ]),
         Spacer(1, 8),
         KeepTogether([
