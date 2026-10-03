@@ -66,6 +66,12 @@ JUNK_ADDR = re.compile(
     r"(no-?reply|do-?not-?reply|mailer-daemon|postmaster|notification|newsletter|bounce|"
     r"unsubscribe|marketing|alerts?@|news@|info@.*(mail|email)\.|support@|billing@|receipts?@|"
     r"@.*\.(hubspot|mailchimp|sendgrid|mcsv|constantcontact|salesforce)\.)", re.I)
+FORM_SENDER = re.compile(
+    r"(squarespace|wix|wordpress|wpforms|jotform|typeform|hubspot|gravity ?forms|formspree|"
+    r"elementor|ninja ?forms|google ?forms|zoho ?forms|contact ?form|webflow|godaddy)", re.I)
+FORM_SUBJECT = re.compile(
+    r"(form submission|new (lead|inquiry|enquiry|submission|contact|request)|contact form|"
+    r"quote request|request a quote|website inquiry)", re.I)
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+'\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(?:\+?1[\s.\-]?)?\(?\b([2-9]\d{2})\)?[\s.\-]*([2-9]\d{2})[\s.\-]*(\d{4})\b")
 
@@ -154,7 +160,7 @@ def signature_phone(body):
 def new_person():
     return {
         "name": "", "company": "", "phone": "", "sources": set(),
-        "first": None, "last": None, "sent_to": 0, "received_from": 0, "bulk": 0,
+        "first": None, "last": None, "sent_to": 0, "received_from": 0, "bulk": 0, "web_form": 0,
         "inspections": 0, "training": 0, "staffing": 0,
         "last_inspections": None, "last_training": None, "last_staffing": None,
     }
@@ -164,12 +170,14 @@ people = defaultdict(new_person)
 phone_only = {}
 
 
-def touch(addr, name, when, direction, cats, bulk=False, phone=""):
+def touch(addr, name, when, direction, cats, bulk=False, phone="", web_form=False):
     addr = addr.lower().strip(".")
-    if is_me(addr) or JUNK_ADDR.search(addr):
+    if is_me(addr) or (JUNK_ADDR.search(addr) and not web_form):
         return
     p = people[addr]
-    p["sources"].add("gmail")
+    p["sources"].add("web_form" if web_form else "gmail")
+    if web_form:
+        p["web_form"] += 1
     if name and not p["name"] and "@" not in name:
         p["name"] = name.strip().strip('"')
     if phone and not p["phone"]:
@@ -209,6 +217,25 @@ def process_mbox(path):
             text = subject + "\n" + own_text(body)
             cats = [k for k, rx in KW.items() if rx.search(text)]
             bulk = bool(msg.get("List-Unsubscribe") or (msg.get("Precedence") or "").lower() in ("bulk", "list"))
+            if not is_me(frm) and (FORM_SENDER.search(frm + " " + frm_name) or FORM_SUBJECT.search(subject)):
+                # Website form notification: the lead is in Reply-To and/or the body, not the sender
+                leads = {}
+                rt_name, rt = email.utils.parseaddr(dec(msg.get("Reply-To")))
+                if rt and not is_me(rt) and not JUNK_ADDR.search(rt):
+                    leads[rt.lower()] = rt_name
+                for e in EMAIL_RE.findall(own_text(body)):
+                    if not is_me(e) and not JUNK_ADDR.search(e):
+                        leads.setdefault(e.lower(), "")
+                phone = norm_phone(own_text(body))
+                name_m = re.search(r"^\s*(?:full\s+)?name\s*[:\-]\s*(.+)$", own_text(body), re.I | re.M)
+                for addr, nm in leads.items():
+                    touch(addr, nm or (name_m.group(1).strip() if name_m else ""), when, "in", cats,
+                          phone=phone, web_form=True)
+                if not leads and phone:
+                    phone_only.setdefault(phone, {"name": name_m.group(1).strip() if name_m else "",
+                                                  "company": "", "phone": phone,
+                                                  "source": "web_form"})
+                continue
             if is_me(frm):
                 rcpts = email.utils.getaddresses(
                     [dec(msg.get(h)) for h in ("To", "Cc", "Bcc") if msg.get(h)])
@@ -294,7 +321,7 @@ def write_outputs(outdir):
     rows = []
     for addr, p in people.items():
         two_way = p["sent_to"] > 0 and p["received_from"] > 0
-        newsletter = p["bulk"] > 0 and p["sent_to"] == 0
+        newsletter = p["bulk"] > 0 and p["sent_to"] == 0 and not p["web_form"]
         if newsletter:
             continue
         svc = {k: p[k] for k in ("inspections", "training", "staffing")}
@@ -312,6 +339,7 @@ def write_outputs(outdir):
             "emails_you_sent": p["sent_to"],
             "emails_they_sent": p["received_from"],
             "two_way_conversation": "yes" if two_way else "no",
+            "web_form_lead": "yes" if p["web_form"] else "",
             "primary_service": primary,
             "tag_inspections": "yes" if p["inspections"] else "",
             "tag_training": "yes" if p["training"] else "",
@@ -325,7 +353,7 @@ def write_outputs(outdir):
         })
     for ph, c in phone_only.items():
         rows.append({"email": "", "name": c["name"], "company": c["company"], "phone": ph,
-                     "type": "phone only", "source": "google_contacts", "within_last_2_years": "unknown"})
+                     "type": "phone only", "source": c.get("source", "google_contacts"), "within_last_2_years": "unknown"})
     rows.sort(key=lambda r: r.get("last_contact") or "", reverse=True)
     fields = list(rows[0].keys()) if rows else ["email"]
     for r in rows:
@@ -365,6 +393,7 @@ def write_outputs(outdir):
     print(f"  with phone:            {sum(1 for r in rows if r['phone']):,}")
     print(f"  contacted last 2 yrs:  {recent:,}")
     print(f"  two-way conversations: {sum(1 for r in rows if r.get('two_way_conversation') == 'yes'):,}")
+    print(f"  website form leads:    {sum(1 for r in rows if r.get('web_form_lead') == 'yes'):,}")
     for k in ("inspections", "training", "staffing"):
         print(f"  tagged {k:12s}  {sum(1 for r in rows if r.get('tag_' + k)):,}")
     print(f"Companies (domains):     {len(comps):,}")

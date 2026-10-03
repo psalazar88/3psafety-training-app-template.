@@ -3,6 +3,8 @@
 The sorter turns your entire email history and contacts into one spreadsheet.
 It tags every person as **Inspections / Training / Staffing**, records the dates you
 last emailed them about each service, and removes newsletters and spam.
+It also captures website form leads (Squarespace, Wix, WordPress, etc.) from the form
+notification emails, including leads who left only a phone number.
 Everything runs on your PC. Nothing is uploaded.
 
 ## 1. Download everything from Google (one time)
