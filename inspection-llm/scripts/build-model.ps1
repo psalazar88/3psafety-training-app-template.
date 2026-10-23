@@ -5,10 +5,14 @@
 
 $root = Split-Path -Parent $PSScriptRoot
 $rulebook = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'rulebook\system-prompt.md')
+# Every checklist in rulebook\checklists\ is added to the rulebook.
+foreach ($c in Get-ChildItem (Join-Path $root 'rulebook\checklists') -Filter *.md | Sort-Object Name) {
+    $rulebook += "`n`n" + (Get-Content -Raw -Encoding UTF8 $c.FullName)
+}
 $modelfile = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'Modelfile')
 
 # Ollama's SYSTEM block is wrapped in triple quotes, so the rulebook must not contain them.
-if ($rulebook.Contains('"""')) { throw 'rulebook/system-prompt.md must not contain triple quotes (""").' }
+if ($rulebook.Contains('"""')) { throw 'The rulebook and checklists must not contain triple quotes (""").' }
 
 $built = $modelfile.Replace('{{RULEBOOK}}', $rulebook)
 $out = Join-Path $env:TEMP 'Modelfile.3p-inspector'

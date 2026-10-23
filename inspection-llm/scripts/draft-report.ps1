@@ -5,7 +5,7 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\draft-report.ps1 -Case test-cases\_example -Model qwen3-vl
 #
 # A test case folder holds:
-#   notes.md         field notes, unit IDs, inspection type   (required)
+#   notes.md         field notes, unit IDs, inspection type   (optional - photos only works too)
 #   customer.txt     name of a folder under memory\           (optional)
 #   *.jpg / *.png    photos                                   (optional)
 #   actual-report.*  the report you really wrote, for comparing (ignored here)
@@ -13,16 +13,20 @@
 param(
     [Parameter(Mandatory = $true)][string]$Case,
     [string]$Model = '3p-inspector',
+    # Used when there is no notes.md, e.g. -Equipment 'overhead crane'.
+    [string]$Equipment = 'mobile crane',
     [string]$OllamaUrl = 'http://localhost:11434'
 )
 
 $root = Split-Path -Parent $PSScriptRoot
 $caseDir = Resolve-Path $Case
 $notesPath = Join-Path $caseDir 'notes.md'
-if (-not (Test-Path $notesPath)) { throw "Missing $notesPath" }
-
-$prompt = "Write a draft inspection report from these field notes and photos.`n`n## Field notes`n" +
-    (Get-Content -Raw -Encoding UTF8 $notesPath)
+if (Test-Path $notesPath) {
+    $prompt = "Write a draft inspection report from these field notes and photos.`n`n## Field notes`n" +
+        (Get-Content -Raw -Encoding UTF8 $notesPath)
+} else {
+    $prompt = "Make a $Equipment inspection report based on the photos provided."
+}
 
 # Customer memory: equipment history and preferences for this customer.
 $customerFile = Join-Path $caseDir 'customer.txt'
@@ -40,6 +44,7 @@ $photos = Get-ChildItem $caseDir -File | Where-Object { $_.Extension -match '^\.
 if ($photos) {
     $prompt += "`n`n## Photos (in this order)`n" + (($photos | ForEach-Object { "- $($_.Name)" }) -join "`n")
 }
+if (-not $photos -and -not (Test-Path $notesPath)) { throw "No notes.md and no photos in $caseDir" }
 $images = @($photos | ForEach-Object { [Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName)) })
 
 $body = @{

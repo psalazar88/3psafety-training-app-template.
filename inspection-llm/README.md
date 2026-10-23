@@ -48,8 +48,8 @@ Open `http://<server-ip>:3000`. Put it behind HTTPS and a login before any custo
 The model has to read photos (a "vision" model). Check the current tags on https://ollama.com/library. As of Oct 2026 the leading open vision families are **Gemma 4** and **Qwen3-VL / Qwen3.5**, with Qwen stronger at reading labels, tags and documents.
 
 ```powershell
-ollama pull gemma4       # check the exact tag/size on ollama.com
-ollama pull qwen3-vl     # second candidate, to compare
+ollama pull qwen3-vl:8b  # fits a 16 GB card; check the exact tag on ollama.com
+ollama pull gemma4       # second candidate, to compare
 ```
 
 Pick a size that fits your memory: roughly the model's download size plus 20–30%.
@@ -82,6 +82,25 @@ If it misses real defects or invents ones that aren't there, fix the rulebook, t
 2. **Workspace → Models:** pick `3p-inspector` and attach both collections.
 3. **Per customer:** create a Knowledge collection per customer from `memory/<customer>/` and attach it only when working that customer's job.
 4. Start a chat with `3p-inspector`, drop in photos and notes, and ask for the draft report.
+
+## Photos-only report (mobile crane)
+
+In Open WebUI, pick `3p-inspector`, drag in the photos, and type:
+
+> Make a mobile crane inspection report based on the photos provided.
+
+It identifies what each photo shows and works through the mobile crane checklist (`rulebook/checklists/mobile-crane.md`). Every item is marked OK, Possible defect, or Not visible. It ends with a list of the extra photos it needs. Nameplate text it can't read clearly is marked `[?]`, not guessed.
+
+From the test script, a test case folder with only photos works too:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\draft-report.ps1 -Case test-cases\<job>
+powershell -ExecutionPolicy Bypass -File .\scripts\draft-report.ps1 -Case test-cases\<job> -Equipment 'overhead crane'
+```
+
+**Photo tips on a 16 GB card:**
+- Send 4–6 photos at a time: nameplate, boom, hook block, rope at drum, outriggers, cab/LMI. Then send the next batch in the same chat.
+- Use close-ups, one component per photo.
+- Add another equipment type by dropping a new checklist (e.g. `overhead-crane.md`) into `rulebook/checklists/` and re-running `build-model.ps1`.
 
 ## Memory: how this matches what you do with Claude
 
