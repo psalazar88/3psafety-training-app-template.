@@ -1,0 +1,12 @@
+# Builds the "3p-inspector" model on top of an open-weight vision model.
+# Check the base model tag on https://ollama.com/library before running, and
+# swap it to whichever model wins your side-by-side test (see README step 4).
+FROM gemma4
+
+# Low temperature: reports should be consistent, not creative.
+PARAMETER temperature 0.2
+# Room for the rulebook, customer memory, reference excerpts and several photos.
+PARAMETER num_ctx 32768
+
+# The rulebook is pasted in by scripts/build-model.ps1 from rulebook/system-prompt.md.
+SYSTEM """{{RULEBOOK}}"""
