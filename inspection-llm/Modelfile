@@ -1,0 +1,13 @@
+# Builds the "3p-inspector" model on top of an open-weight vision model.
+# Qwen3-VL 8B fits fully on a 16 GB graphics card (RTX 5070 Ti). Check the exact
+# tag on https://ollama.com/library/qwen3-vl before running, and swap it to
+# whichever model wins your side-by-side test (see README step 4).
+FROM qwen3-vl:8b
+
+# Low temperature: reports should be consistent, not creative.
+PARAMETER temperature 0.2
+# Room for the rulebook, checklists, customer memory and a few photos.
+PARAMETER num_ctx 32768
+
+# The rulebook and checklists are pasted in by scripts/build-model.ps1.
+SYSTEM """{{RULEBOOK}}"""
